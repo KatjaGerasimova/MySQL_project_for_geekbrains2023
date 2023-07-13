@@ -1,0 +1,259 @@
+DROP DATABASE IF EXISTS teleg_lite;
+CREATE DATABASE IF NOT EXISTS  teleg_lite;
+use teleg_lite;
+
+
+DROP TABLE IF EXISTS users;
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  firstname VARCHAR(100) NULL, 
+  lastname VARCHAR(100) NULL,
+  username VARCHAR(100) UNIQUE NULL,
+  about VARCHAR(66) NULL,
+  phone VARCHAR(100) NOT NULL UNIQUE,
+  photo_id BIGINT UNSIGNED NULL,
+  is_bot BOOLEAN NOT NULL DEFAULT FALSE,
+  proxy_settings JSON,
+  created_at DATETIME DEFAULT NOW(),
+  updated_at DATETIME DEFAULT NOW() ON UPDATE NOW()
+);
+
+
+
+INSERT INTO `users`
+VALUES
+('1','Ivanka','Ivanova','Iva', 'smth','79042222221','7','0',NULL,'2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('2','Mary','Petrova','MArPet','smth','79042222220','6','0',NULL,'2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('3','Kate','Ivanovich','Kativ','smth','79042222223','5','0',NULL,'2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('4','Alexandra','Sidorova','Sidal','smth','79042222226','9','0',NULL,'2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('5','Natasha','Bucharova','Natbush','smth','79042222227','3','0',NULL,'2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('6','Tanja','Kopteva','Koptan','smth','79042222228','12','0',NULL,'2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('7','Kate','Djatlova','Djatel','smth','79042222229','13','0',NULL,'2022-03-02 13:20:00','2023-01-02 13:20:00')
+;
+
+
+
+
+DROP TABLE IF EXISTS media_types;
+CREATE TABLE media_types(
+	id SERIAL,
+	name VARCHAR(255)
+);
+
+DROP TABLE IF EXISTS media;
+CREATE TABLE media(
+	id SERIAL,
+	user_id BIGINT UNSIGNED NOT NULL,
+	media_type_id BIGINT UNSIGNED NOT NULL,
+	body VARCHAR(255),
+	filename VARCHAR(255),
+	metadata JSON, 
+	created_at DATETIME DEFAULT NOW(),
+	updated_at DATETIME ON UPDATE CURRENT_TIMESTAMP,
+	
+	
+	FOREIGN KEY (user_id) REFERENCES users(id),
+	FOREIGN KEY (media_type_id) REFERENCES media_types(id)
+);
+
+
+
+
+DROP TABLE IF EXISTS channels;
+CREATE TABLE channels(
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  is_public BOOLEAN NOT NULL DEFAULT FALSE,
+  about VARCHAR(255) NULL,
+  photo_id BIGINT UNSIGNED NULL,
+  FOREIGN KEY (photo_id) REFERENCES media(id),
+  created_at DATETIME DEFAULT NOW(),
+  updated_at DATETIME DEFAULT NOW() ON UPDATE CURRENT_TIMESTAMP
+);
+
+
+
+DROP TABLE IF EXISTS chats;
+CREATE TABLE chats(
+  id SERIAL PRIMARY KEY,
+  title VARCHAR(200) NULL,
+  photo_id BIGINT UNSIGNED NULL,
+  FOREIGN KEY (photo_id) REFERENCES media(id),
+  
+  created_at DATETIME DEFAULT NOW(),
+  updated_at DATETIME ON UPDATE CURRENT_TIMESTAMP
+);
+
+
+
+DROP TABLE IF EXISTS chats_users;
+CREATE TABLE chats_users (
+  	id SERIAL,
+  	from_user_id BIGINT UNSIGNED NOT NULL,
+  	to_user_id BIGINT UNSIGNED NOT NULL,
+
+	FOREIGN KEY (from_user_id) REFERENCES users(id),
+	FOREIGN KEY (to_user_id) REFERENCES users(id)
+
+);
+
+DROP TABLE IF EXISTS friend_request;
+CREATE TABLE friend_request(
+
+	initiator_user_id BIGINT UNSIGNED NOT NULL,
+	target_user_id BIGINT UNSIGNED NOT NULL,
+	status ENUM ('requested', 'approved', 'declined', 'unfriended'),
+	created_at DATETIME DEFAULT NOW(),
+	updated_at DATETIME ON UPDATE CURRENT_TIMESTAMP,
+	
+	
+	PRIMARY KEY (initiator_user_id, target_user_id),
+	FOREIGN KEY (initiator_user_id) REFERENCES users(id),
+	FOREIGN KEY (target_user_id) REFERENCES users(id),
+	CHECK (initiator_user_id != target_user_id)
+	
+);
+
+
+DROP TABLE IF EXISTS communities;
+CREATE TABLE communities(
+  id SERIAL,
+  name VARCHAR(255),
+  admin_user_id BIGINT UNSIGNED NOT NULL,
+  is_public BOOLEAN NOT NULL DEFAULT FALSE,
+  about VARCHAR(255) NULL,
+  photo_id BIGINT UNSIGNED NULL,
+  created_at DATETIME DEFAULT NOW(),
+  updated_at DATETIME  ON UPDATE CURRENT_TIMESTAMP,
+  
+  INDEX (name),
+  FOREIGN KEY (admin_user_id) REFERENCES users(id)
+  
+);
+
+
+
+
+DROP TABLE IF EXISTS channels_messages;
+CREATE TABLE channels_messages (
+  id SERIAL PRIMARY KEY,
+  from_channel_id BIGINT NULL,
+  from_auther_id BIGINT UNSIGNED NULL,
+  to_user_id BIGINT UNSIGNED NULL,
+  message TEXT NOT NULL,
+  delivered BOOLEAN,
+  views_count INT UNSIGNED NOT NULL DEFAULT 1,
+  media_id BIGINT UNSIGNED NULL,
+  FOREIGN KEY (from_channel_id) REFERENCES channels(id),
+  FOREIGN KEY (from_auther_id) REFERENCES users(id),
+  FOREIGN KEY (to_user_id) REFERENCES users(id),
+  FOREIGN KEY (media_id) REFERENCES media(id),
+  INDEX channels_messages_from_auther_id_idx (from_auther_id),
+  created_at DATETIME DEFAULT NOW(),
+  edited_at DATETIME DEFAULT NOW() ON UPDATE NOW()
+);
+
+INSERT INTO media_types VALUES
+  (1,"contact"),
+  (2,"document"),
+  (3,"game"),
+  (4,"geo_live"),
+  (5,"geo_point"),
+  (6,"gif"),
+  (7,"photo")
+ ;
+
+
+INSERT INTO `media`
+VALUES
+('1','3','3','vv','f',"{}",'2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('2','7','4','cc','d',"{}",'2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('3','2','7','xx','s',"{}",'2022-03-02 13:20:00','2023-01-02 13:20:00')
+;
+
+ 
+   
+
+
+INSERT INTO `channels`
+VALUES 
+('1','c','1','','3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('2','v','0','','3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('3','a','0','','3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('4','e','1','','3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('5','o','1','','3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('6','aa','1','','3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('7','i.','0','','3','2022-03-02 13:20:00','2023-01-02 13:20:00')
+;
+
+
+INSERT INTO `chats`
+VALUES 
+('1','t','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('2','n','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('3','e','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('4','a','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('5','q','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('6','y.','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('7','o','1','2022-03-02 13:20:00','2023-01-02 13:20:00')
+;
+
+INSERT INTO `chats_users` 
+VALUES 
+('1','1','6'),
+('2','4','2'),
+('3','3','6'),
+('4','1','2'),
+('5','3','5'),
+('6','3','1')
+;
+
+INSERT INTO `communities`
+VALUES 
+('1','a','2','0','','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('2','b','2','0','','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('3','c','2','0','','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('4','d','2','1','','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('5','e','2','1','','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('6','j','2','0','','1','2022-03-02 13:20:00','2023-01-02 13:20:00')
+;
+
+INSERT INTO `channels_messages` VALUES 
+('1', '1', '1', NULL, "smth", '1', '2', '3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('2', '5', '7', NULL, "smth", '1', '24', '3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('4', '4', '2', NULL, "smth", '1', '88', '3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('5', '4', '3', NULL, "smth", '1', '100002', '3','2022-03-02 13:20:00','2023-01-02 13:20:00')
+;
+
+
+-- connection between users and channels
+
+DROP TABLE IF EXISTS user_roles;
+CREATE TABLE user_roles (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  user_role VARCHAR(30) NOT NULL COMMENT 'admin, creator or participant'
+);
+DROP TABLE IF EXISTS channels_users;
+CREATE TABLE channels_users (
+  channel_id BIGINT NOT NULL,
+  user_id BIGINT UNSIGNED NOT NULL,
+  user_role INT UNSIGNED NOT NULL,
+  user_permissions SET('no_rights', 'add_subscribers', 'change_chanel_info', 'post_messages', 'edit_messages_of_others', 'delete_messages_of_others'),
+  FOREIGN KEY (channel_id) REFERENCES channels(id),
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (user_role) REFERENCES user_roles(id),
+  PRIMARY KEY (channel_id, user_id)
+);
+
+-- connection between users and communities
+DROP TABLE IF EXISTS communities_users;
+CREATE TABLE communities_users (
+  community_id BIGINT UNSIGNED NOT NULL,
+  user_id BiGINT UNSIGNED NOT NULL,
+  user_role INT UNSIGNED NOT NULL,
+  user_permissions SET('send_messages', 'delete_messages', 'add_users','ban_users', 'send_media', 'send_stickers', 'embed_links', 'change_group_info'),
+  FOREIGN KEY (community_id) REFERENCES communities(id),
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (user_role) REFERENCES user_roles(id),
+  PRIMARY KEY (community_id, user_id)
+);
