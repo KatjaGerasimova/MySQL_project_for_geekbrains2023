@@ -1,0 +1,398 @@
+-- FINAL_PROJECT_
+
+
+Данная база данных представляет собой сильно упрощённую версию  социальной сети Telegram
+
+
+
+DROP DATABASE IF EXISTS teleg_lite;
+CREATE DATABASE IF NOT EXISTS  teleg_lite;
+use teleg_lite;
+
+
+DROP TABLE IF EXISTS users;
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  firstname VARCHAR(100) NULL, 
+  lastname VARCHAR(100) NULL,
+  username VARCHAR(100) UNIQUE NULL,
+  about VARCHAR(66) NULL,
+  birth_place VARCHAR(66) NULL,
+  phone VARCHAR(100) NOT NULL UNIQUE,
+  photo_id BIGINT UNSIGNED NULL,
+  is_bot BOOLEAN NOT NULL DEFAULT FALSE,
+  proxy_settings JSON,
+  created_at DATETIME DEFAULT NOW(),
+  updated_at DATETIME DEFAULT NOW() ON UPDATE NOW()
+);
+
+
+
+INSERT INTO `users`
+VALUES
+('1','Ivanka','Ivanova','Iva', 'smth','Moscow','79042222221','7','0',NULL,'2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('2','Mary','Petrova','MArPet','smth','Moscow','79042222220','6','0',NULL,'2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('3','Kate','Ivanovich','Kativ','smth','Moscow','79042222223','5','0',NULL,'2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('4','Alexandra','Sidorova','Sidal','smth','Tumen','79042222226','9','0',NULL,'2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('5','Natasha','Bucharova','Natbush','smth','Moscow','79042222227','3','0',NULL,'2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('6','Tanja','Kopteva','Koptan','smth','SPb','79042222228','12','0',NULL,'2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('7','Kate','Djatlova','Djatel','smth','Moscow','79042222229','13','0',NULL,'2022-03-02 13:20:00','2023-01-02 13:20:00')
+;
+
+
+
+DROP TABLE IF EXISTS media_types;
+CREATE TABLE media_types(
+	id SERIAL,
+	name VARCHAR(255)
+);
+
+DROP TABLE IF EXISTS media;
+CREATE TABLE media(
+	id SERIAL,
+	user_id BIGINT UNSIGNED NOT NULL,
+	media_type_id BIGINT UNSIGNED NOT NULL,
+	body VARCHAR(255),
+	filename VARCHAR(255),
+	metadata JSON, 
+	created_at DATETIME DEFAULT NOW(),
+	updated_at DATETIME ON UPDATE CURRENT_TIMESTAMP,
+	
+	
+	FOREIGN KEY (user_id) REFERENCES users(id),
+	FOREIGN KEY (media_type_id) REFERENCES media_types(id)
+);
+
+
+
+DROP TABLE IF EXISTS channels;
+CREATE TABLE channels(
+  id BIGINT NOT NULL PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  is_public BOOLEAN NOT NULL DEFAULT FALSE,
+  about VARCHAR(255) NULL,
+  link VARCHAR(100) UNIQUE NULL,
+  photo_id BIGINT UNSIGNED NULL,
+  CONSTRAINT channels_photo_id_fk FOREIGN KEY (photo_id) REFERENCES media(id)
+    ON DELETE SET NULL,
+  created_at DATETIME DEFAULT NOW(),
+  updated_at DATETIME DEFAULT NOW() ON UPDATE NOW()
+)
+;
+
+DELIMITER //
+
+DROP FUNCTION IF EXISTS gen_link//
+CREATE FUNCTION gen_link() RETURNS TEXT NO SQL
+BEGIN
+  RETURN CONCAT("https://t.me/joinchat/", LEFT(UUID(), 22));
+END //
+
+-- link for channels
+DROP TRIGGER IF EXISTS before_insert_channels//
+CREATE TRIGGER before_insert_channels BEFORE INSERT ON channels FOR EACH ROW
+BEGIN
+  IF NEW.link IS NULL
+    THEN SET NEW.link = gen_link();
+  END IF;
+END //
+
+DELIMITER ;
+
+DROP TABLE IF EXISTS chats;
+CREATE TABLE chats(
+  id SERIAL PRIMARY KEY,
+  title VARCHAR(200) NULL,
+  photo_id BIGINT UNSIGNED NULL,
+  FOREIGN KEY (photo_id) REFERENCES media(id),
+  
+  created_at DATETIME DEFAULT NOW(),
+  updated_at DATETIME ON UPDATE CURRENT_TIMESTAMP
+);
+
+
+
+DROP TABLE IF EXISTS chats_users;
+CREATE TABLE chats_users (
+  	id SERIAL,
+  	from_user_id BIGINT UNSIGNED NOT NULL,
+  	to_user_id BIGINT UNSIGNED NOT NULL,
+
+	FOREIGN KEY (from_user_id) REFERENCES users(id),
+	FOREIGN KEY (to_user_id) REFERENCES users(id)
+
+);
+
+DROP TABLE IF EXISTS friend_request;
+CREATE TABLE friend_request(
+	initiator_user_id BIGINT UNSIGNED NOT NULL,
+	target_user_id BIGINT UNSIGNED NOT NULL,
+	status ENUM ('requested', 'approved', 'declined', 'unfriended'),
+
+	
+	
+	PRIMARY KEY (initiator_user_id, target_user_id),
+	FOREIGN KEY (initiator_user_id) REFERENCES users(id),
+	FOREIGN KEY (target_user_id) REFERENCES users(id),
+	CHECK (initiator_user_id != target_user_id)
+	
+);
+
+DROP TABLE IF EXISTS communities;
+CREATE TABLE communities(
+  id SERIAL,
+  name VARCHAR(255),
+  admin_user_id BIGINT UNSIGNED NOT NULL,
+  is_public BOOLEAN NOT NULL DEFAULT FALSE,
+  link VARCHAR(100) UNIQUE NULL,
+  about VARCHAR(255) NULL,
+  photo_id BIGINT UNSIGNED NULL,
+  created_at DATETIME DEFAULT NOW(),
+  updated_at DATETIME  ON UPDATE CURRENT_TIMESTAMP,
+  
+  INDEX (name),
+  FOREIGN KEY (admin_user_id) REFERENCES users(id)
+  
+);
+
+DELIMITER //
+
+-- link for communities
+DROP TRIGGER IF EXISTS before_insert_communities//
+CREATE TRIGGER before_insert_communities BEFORE INSERT ON communities FOR EACH ROW
+BEGIN
+  IF NEW.link IS NULL
+    THEN SET NEW.link = gen_link();
+  END IF;
+END //
+
+DELIMITER ;
+
+
+
+
+
+DROP TABLE IF EXISTS channels_messages;
+CREATE TABLE channels_messages (
+  id SERIAL PRIMARY KEY,
+  from_channel_id BIGINT NULL,
+  from_auther_id BIGINT UNSIGNED NULL,
+  to_user_id BIGINT UNSIGNED NULL,
+  message TEXT NOT NULL,
+  delivered BOOLEAN,
+  views_count INT UNSIGNED NOT NULL DEFAULT 1,
+  media_id BIGINT UNSIGNED NULL,
+  FOREIGN KEY (from_channel_id) REFERENCES channels(id),
+  FOREIGN KEY (from_auther_id) REFERENCES users(id),
+  FOREIGN KEY (to_user_id) REFERENCES users(id),
+  FOREIGN KEY (media_id) REFERENCES media(id),
+  INDEX channels_messages_from_auther_id_idx (from_auther_id),
+  created_at DATETIME DEFAULT NOW(),
+  edited_at DATETIME DEFAULT NOW() ON UPDATE NOW()
+);
+
+INSERT INTO media_types VALUES
+  (1,"contact"),
+  (2,"document"),
+  (3,"game"),
+  (4,"geo_live"),
+  (5,"geo_point"),
+  (6,"gif"),
+  (7,"photo")
+ ;
+
+
+INSERT INTO `media`
+VALUES
+('1','3','3','vv','f',"{}",'2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('2','7','4','cc','d',"{}",'2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('3','2','7','xx','s',"{}",'2022-03-02 13:20:00','2023-01-02 13:20:00')
+;
+
+ 
+   
+
+
+INSERT INTO `channels`
+VALUES 
+('1','c','1','','SMTHH_help','3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('2','v','0','','SMTHH_ok','3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('3','a','0','',NULL,'3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('4','e','1','',NULL,'3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('5','o','1','',NULL,'3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('6','aa','1','',NULL,'3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('7','i.','0','',NULL,'3','2022-03-02 13:20:00','2023-01-02 13:20:00')
+;
+
+
+
+INSERT INTO `chats`
+VALUES 
+('1','t','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('2','n','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('3','e','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('4','a','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('5','q','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('6','y.','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('7','o','1','2022-03-02 13:20:00','2023-01-02 13:20:00')
+;
+
+INSERT INTO `chats_users` 
+VALUES 
+('1','1','6'),
+('2','4','2'),
+('3','3','6'),
+('4','1','2'),
+('5','3','5'),
+('6','3','1')
+;
+
+INSERT INTO `communities`
+VALUES 
+('1','a','2','0','smth_help','','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('2','a','2','0','smth_ru','','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('3','a','2','0',NULL,'','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('4','a','2','0','smth_OK','','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('5','a','2','0',NULL,'','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('6','a','2','0',NULL,'','1','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('7','a','2','0',NULL,'','1','2022-03-02 13:20:00','2023-01-02 13:20:00')
+
+;
+
+INSERT INTO `channels_messages` VALUES 
+('1', '1', '1', NULL, "smth", '1', '2', '3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('2', '5', '7', NULL, "smth", '1', '24', '3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('4', '4', '2', NULL, "smth", '1', '88', '3','2022-03-02 13:20:00','2023-01-02 13:20:00'),
+('5', '4', '3', NULL, "smth", '1', '100002', '3','2022-03-02 13:20:00','2023-01-02 13:20:00')
+;
+
+
+
+
+INSERT INTO `friend_request`
+VALUES 
+('1','2','approved'),
+('3','4','approved'),
+('5','6','approved'),
+('7','1','approved')
+
+;
+
+-- connection between users and channels
+
+DROP TABLE IF EXISTS user_roles;
+CREATE TABLE user_roles (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  user_role VARCHAR(30) NOT NULL COMMENT 'admin, creator or participant'
+); 
+INSERT INTO user_roles VALUES
+  (1,"participant"),
+  (2,"admin"),
+  (3,"creator");
+
+
+DROP TABLE IF EXISTS channels_users;
+CREATE TABLE channels_users (
+  channel_id BIGINT NOT NULL COMMENT 'is < 0',
+  user_id BIGINT UNSIGNED NOT NULL,
+  user_role INT UNSIGNED NOT NULL,
+  user_permissions SET('no_rights', 'change_chanel_info', 'post_messages', 'edit_messages_of_others', 'delete_messages_of_others', 'add_subscribers', 'add_new_admins'),
+  CONSTRAINT channels_users_channel_id_fk FOREIGN KEY (channel_id) REFERENCES channels(id)
+    ON DELETE CASCADE,
+  CONSTRAINT channels_users_user_id_fk FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE CASCADE,
+  CONSTRAINT channels_users_user_role_fk FOREIGN KEY (user_role) REFERENCES user_roles(id)
+    ON DELETE RESTRICT,
+  PRIMARY KEY (channel_id, user_id)
+);
+
+INSERT INTO `channels_users`
+VALUES 
+('1','1','1','no_rights'),
+('1','2','3','change_chanel_info,post_messages,edit_messages_of_others,delete_messages_of_others,add_subscribers,add_new_admins'),
+('1','3','1','no_rights'),
+('1','4','1','no_rights'),
+('1','5','1','no_rights'),
+('1','6','2','change_chanel_info,post_messages,edit_messages_of_others,delete_messages_of_others'),
+('1','7','3','change_chanel_info,post_messages,edit_messages_of_others,delete_messages_of_others,add_subscribers,add_new_admins'),
+('2','1','1','no_rights'),
+('2','2','3','change_chanel_info,post_messages,edit_messages_of_others,delete_messages_of_others,add_subscribers,add_new_admins'),
+('2','3','1','no_rights'),
+('2','4','3','change_chanel_info,post_messages,edit_messages_of_others,delete_messages_of_others,add_subscribers,add_new_admins'),
+('2','5','1','no_rights'),
+('2','6','2','change_chanel_info,post_messages,edit_messages_of_others,delete_messages_of_others'),
+('2','7','1','no_rights');
+
+
+DROP TABLE IF EXISTS communities_users;
+CREATE TABLE communities_users (
+  community_id BIGINT UNSIGNED NOT NULL,
+  user_id BiGINT UNSIGNED NOT NULL,
+  user_role INT UNSIGNED NOT NULL,
+  user_permissions SET('send_messages', 'send_media', 'send_stickers', 'embed_links', 'send_polls', 'add_members', 'pin_messages', 'change_group_info', 'delete_messages', 'ban_users'),
+  FOREIGN KEY (community_id) REFERENCES communities(id),
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (user_role) REFERENCES user_roles(id),
+  PRIMARY KEY (community_id, user_id)
+);
+
+INSERT INTO `communities_users`
+VALUES 
+('1','1','3','send_messages,send_media,send_stickers,embed_links,send_polls,add_members,pin_messages,change_group_info,delete_messages,ban_users'),
+('1','2','1','send_messages,send_media,send_stickers,embed_links,send_polls'),
+('1','3','1','send_messages,send_media,send_stickers,embed_links,send_polls');
+
+INSERT INTO `communities_users`
+VALUES 
+('3','6','2','send_messages,send_media,send_stickers,embed_links,send_polls,add_members,pin_messages,change_group_info');
+
+
+-- представления
+
+-- представление юзеров, исключительно жителей Москвы
+CREATE VIEW Moscow_citiesens
+	AS SELECT *
+	FROM users 
+	WHERE birth_place = 'Moscow';
+	
+select *
+from Moscow_citiesens;
+
+
+-- представление названий каналов и их количество
+
+
+
+CREATE VIEW v
+	AS SELECT title, count(*)
+	AS num FROM channels 
+	GROUP BY id;
+	
+SELECT *
+FROM v
+
+
+-- запросы
+
+-- Список групп и каналов, в которых состоит данный пользователь(id=3)
+
+SELECT "channel" AS type, ch.id, ch.title, ch.link FROM channels AS ch
+  INNER JOIN channels_users AS ch_us
+    ON ch.id = ch_us.channel_id AND ch_us.user_id = 3
+
+UNION
+
+SELECT "communities"  AS type, com.id, LEFT(com.name,20), com.link FROM communities AS com
+  INNER JOIN communities_users AS com_us
+    ON com.id = com_us.community_id AND com_us.user_id = 3;
+
+
+-- Получение прав администраторов определённого комьюнити
+
+SELECT user_id, user_permissions FROM communities_users WHERE community_id=1 AND user_role!=1;
+
+
+
+-- Получение администраторов группы, имеющих право банить пользователей
+
+SELECT user_id FROM communities_users WHERE community_id=3 AND FIND_IN_SET('add_members', user_permissions);
